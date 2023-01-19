@@ -1,8 +1,8 @@
 # Custom GemFire Metrics
 
 This project is an example of custom metrics for both GemFire clients and servers.
-Custom GemFire metrics allows a user to create their own application metrics and expose these
-metrics using a custom metrics publisher that is started and stopped when a GemFire client
+Custom GemFire metrics provides an example on how to create custom application metrics and expose these
+metrics using a custom metrics publisher. The customer metrics publisher is automatically started and stopped when a GemFire client
 or server is started or stopped.
 
 ### Client Implementation
@@ -51,4 +51,8 @@ To enable JVM and GemFire metrics, pass the property -Dcapture-jvm-gemfire-stats
 
 #### Server
 
+When starting a server add the gemfire-metrics-1.0.0-SNAPSHOT.jar to the classpath.
+
 To enable JVM and GemFire metrics, pass the property --J=-Dcapture-jvm-gemfire-stats=true when starting a GemFire server.
+
+`gfsh> start server --name server --dir server --locators localhost[10334] --classpath target/gemfire-metrics-1.0.0-SNAPSHOT.jar:jars/* --J=-Dcapture-jvm-gemfire-stats=false --J=-Dmetrics-port=9115`
