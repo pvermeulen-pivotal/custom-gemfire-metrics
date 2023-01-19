@@ -29,6 +29,10 @@ The server example uses a GemFire function that creates four (4) metrics:
 * Message processing time
 * Message queue gauge
 
+Deploy the gemfire-metrics-1.0.0.-SNAPSHOT.jar 
+
+`deploy --jar gemfire-metrics-1.0.0-SNAPSHOT.jar`
+
 Execute the function below to start the gathering of custom server metrics.
 
 `execute function --id=ApplicationServerMetricsFunction --member {a member name} --arguments="test_server,start"`
@@ -51,15 +55,16 @@ To enable JVM and GemFire metrics, pass the property -Dcapture-jvm-gemfire-stats
 
 #### Server
 
-When starting a server add the gemfire-metrics-1.0.0-SNAPSHOT.jar to the classpath.
-
 To enable JVM and GemFire metrics, pass the property --J=-Dcapture-jvm-gemfire-stats=true when starting a GemFire server.
 
-`gfsh> start server --name server --dir server --locators localhost[10334] --classpath target/gemfire-metrics-1.0.0-SNAPSHOT.jar:jars/* --J=-Dcapture-jvm-gemfire-stats=false --J=-Dmetrics-port=9115`
+Also, when starting a server add the gemfire-metrics-1.0.0-SNAPSHOT.jar to the classpath. This is needed
+so when the GemFire client or server is initializing it will start the custom metrics publisher. `See Note Section Below`
+
+`start server --name server --dir server --locators localhost[10334] --classpath target/gemfire-metrics-1.0.0-SNAPSHOT.jar:jars/* --J=-Dcapture-jvm-gemfire-stats=false --J=-Dmetrics-port=9115`
 
 
 ### Note
 
-To have GemFire client or server start abnd stop custom metrics publisher a
-`META-INF.services` files needs to be created under resources and must contain `org.apache.geode.metrics.MetricsPublishingService`.
+To have a GemFire client or server start and stop custom metrics publisher a
+`META-INF.services` file needs to be created under resources and must contain `org.apache.geode.metrics.MetricsPublishingService`.
 
