@@ -56,3 +56,10 @@ When starting a server add the gemfire-metrics-1.0.0-SNAPSHOT.jar to the classpa
 To enable JVM and GemFire metrics, pass the property --J=-Dcapture-jvm-gemfire-stats=true when starting a GemFire server.
 
 `gfsh> start server --name server --dir server --locators localhost[10334] --classpath target/gemfire-metrics-1.0.0-SNAPSHOT.jar:jars/* --J=-Dcapture-jvm-gemfire-stats=false --J=-Dmetrics-port=9115`
+
+
+### Note
+
+To have GemFire client or server start abnd stop custom metrics publisher a
+`META-INF.services` files needs to be created under resources and must contain `org.apache.geode.metrics.MetricsPublishingService`.
+
