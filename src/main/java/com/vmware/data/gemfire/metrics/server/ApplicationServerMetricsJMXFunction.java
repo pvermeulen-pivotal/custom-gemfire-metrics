@@ -31,7 +31,7 @@ public class ApplicationServerMetricsJMXFunction implements Function {
         if (publishingService == null) {
             throw new ServiceNotAvailableException("Publishing service has not been provisioned");
         }
-        commonMeterInfo = new CommonMeterInfo();
+        commonMeterInfo = new CommonMeterInfo(false);
     }
 
     private void addSubRegistry(MeterRegistry meterRegistry) throws RegistryExistsException {

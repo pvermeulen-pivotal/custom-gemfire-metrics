@@ -13,7 +13,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.apache.geode.cache.client.ClientCache;
 import org.apache.geode.cache.client.ClientCacheFactory;
 
-import java.util.Random;
 import java.util.Scanner;
 
 @Slf4j
@@ -23,15 +22,13 @@ public class ApplicationServerMetricsClient {
     private String applicationName;
     private ClientCache cache;
     private CommonMeterInfo commonMeterInfo;
-    private Random random;
 
     public ApplicationServerMetricsClient(String applicationName) {
         this.applicationName = applicationName;
-        commonMeterInfo = new CommonMeterInfo(applicationName);
-        random = new Random();
+        commonMeterInfo = new CommonMeterInfo(applicationName, true);
     }
 
-    private void run() throws ServiceNotAvailableException, NoCacheInstanceFound, InterruptedException {
+    private void run() throws ServiceNotAvailableException, NoCacheInstanceFound {
         ClientCacheFactory ccf = new ClientCacheFactory();
         cache = ccf.addPoolLocator("localhost", 10334)
                 .set("log-file", "client.log")
@@ -71,7 +68,7 @@ public class ApplicationServerMetricsClient {
         ApplicationServerMetricsClient client = new ApplicationServerMetricsClient("test_client");
         try {
             client.run();
-        } catch (ServiceNotAvailableException | NoCacheInstanceFound | InterruptedException ex) {
+        } catch (ServiceNotAvailableException | NoCacheInstanceFound ex) {
             log.error("client exception: ", ex);
         }
     }

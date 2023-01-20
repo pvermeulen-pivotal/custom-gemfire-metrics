@@ -2,17 +2,14 @@ package com.vmware.data.gemfire.metrics.common;
 
 import com.vmware.data.gemfire.metrics.exceptions.NoCacheInstanceFound;
 
-import io.micrometer.core.instrument.Clock;
-import io.micrometer.core.instrument.Tag;
+import io.micrometer.core.instrument.*;
 
 import io.micrometer.prometheus.PrometheusConfig;
 import io.micrometer.prometheus.PrometheusMeterRegistry;
 
 import io.prometheus.client.CollectorRegistry;
-import io.prometheus.client.Counter;
-import io.prometheus.client.Gauge;
-import io.prometheus.client.Histogram;
 
+import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
 
 import org.apache.geode.cache.CacheFactory;
@@ -27,40 +24,48 @@ import java.util.Set;
 
 @Slf4j
 public class CommonMeterInfo {
-    private Counter messagesReceivedCounter;
-    private Counter messagesProducedCounter;
-    private Histogram messageProcessingTime;
-    private Gauge messageQueueSizeGauge;
+    private io.micrometer.core.instrument.Counter messagesReceivedCounter;
+    private io.micrometer.core.instrument.Counter messagesProducedCounter;
+    private io.micrometer.core.instrument.Timer messageProcessingTime;
+    private PrometheusMeterRegistry prometheusMeterRegistry;
+    private Iterable<Tag> applicationTags;
+    private NumberGauge messageQueueSizeGauge;
+    private boolean client = false;
+
+    @Setter
     private String applicationName;
 
-    public void setApplicationName(String applicationName) {
+    public CommonMeterInfo(boolean client) {
+        this.client = client;
+    }
+
+    public CommonMeterInfo(String applicationName) {
         this.applicationName = applicationName;
     }
 
-    public CommonMeterInfo() {
-    }
-
-    public CommonMeterInfo(String applicatioName) {
-        this.applicationName = applicatioName;
+    public CommonMeterInfo(String applicationName, boolean client) {
+        this.applicationName = applicationName;
+        this.client = client;
     }
 
     public PrometheusMeterRegistry createCountersAndTimers() throws NoCacheInstanceFound {
         CollectorRegistry registry = CollectorRegistry.defaultRegistry;
 
-        messagesReceivedCounter = Counter.build(this.applicationName + "_messages_received", "Number of messages received by " + this.applicationName)
-                .register(registry);
+        prometheusMeterRegistry = new PrometheusMeterRegistry(PrometheusConfig.DEFAULT, registry, Clock.SYSTEM);
 
-        messagesProducedCounter = Counter.build(this.applicationName + "_messages_published", "Number of messages produced by " + this.applicationName)
-                .register(registry);
+        if (client) {
+            applicationTags = addCommonTags(false,false);
+        } else {
+            applicationTags = addCommonTags(true,true);
+        }
 
-        messageProcessingTime = Histogram.build(this.applicationName + "_processing_time", "Time to process message for application " + this.applicationName)
-                .register(registry);
+        messagesReceivedCounter = prometheusMeterRegistry.counter(this.applicationName + "_messages_received", applicationTags);
 
-        messageQueueSizeGauge = Gauge.build(this.applicationName + "_processing_queue_size", "Message queue depth")
-                .register(registry);
+        messagesProducedCounter = prometheusMeterRegistry.counter(this.applicationName + "_messages_published", applicationTags);
 
-        PrometheusMeterRegistry prometheusMeterRegistry = new PrometheusMeterRegistry(PrometheusConfig.DEFAULT, registry, Clock.SYSTEM);
-        prometheusMeterRegistry.config().commonTags(addCommonTags(false,false));
+        messageProcessingTime = prometheusMeterRegistry.timer(this.applicationName + "_processing_time", applicationTags);
+
+        messageQueueSizeGauge = prometheusMeterRegistry.gauge(this.applicationName + "_processing_queue_size", applicationTags, new NumberGauge(0));
 
         return prometheusMeterRegistry;
     }
@@ -68,51 +73,49 @@ public class CommonMeterInfo {
     public void buildSomeMetrics() {
         Long sleepTime = 500L;
         int counter = 0;
-        messageQueueSizeGauge.set(0d);
+        int sizeOfQueue = 80;
 
         do {
-            messagesReceivedCounter.inc(2d);
-            messageQueueSizeGauge.set(100d);
-            Histogram.Timer timer = messageProcessingTime.startTimer();
+            messagesReceivedCounter.increment(2d);
+            messageQueueSizeGauge.setNewValue(sizeOfQueue);
+            Timer.Sample sample = Timer.start();
             try {
                 Thread.sleep(sleepTime);
             } catch (InterruptedException ex) {
                 // do nothing
             }
-            messageQueueSizeGauge.dec(10d);
+            sizeOfQueue = sizeOfQueue - 10;
             counter++;
-            timer.observeDuration();
-            timer.close();
+            long time = sample.stop(messageProcessingTime);
             sleepTime = sleepTime + 100L;
-            messagesProducedCounter.inc(4d);
+            messagesProducedCounter.increment(4d);
         } while (counter <= 5);
     }
 
-
-    public Iterable<Tag> addCommonTags(boolean hasLocators, boolean hasCacheServer) throws NoCacheInstanceFound {
+    public Tags addCommonTags(boolean hasLocators, boolean hasCacheServer) throws NoCacheInstanceFound {
         ClientCache clientCache = null;
         InternalCache cache = null;
         int clusterId = 0;
         String memberName = null;
         String hostName = null;
-        boolean isClient = false;
 
-        try {
-            clientCache = ClientCacheFactory.getAnyInstance();
-            memberName = clientCache.getDistributedSystem().getDistributedMember().getName();
-            hostName = clientCache.getDistributedSystem().getDistributedMember().getHost();
-            isClient = true;
-        } catch (Exception ex) {
-            log.warn("Not using client cache");
-        }
-
-        try {
-            cache = (InternalCache) CacheFactory.getAnyInstance();
-            clusterId = cache.getInternalDistributedSystem().getConfig().getDistributedSystemId();
-            memberName = cache.getInternalDistributedSystem().getName();
-            hostName = cache.getInternalDistributedSystem().getDistributedMember().getHost();
-        } catch (Exception ex) {
-            log.warn("Not using server cache");
+        if (client) {
+            try {
+                clientCache = ClientCacheFactory.getAnyInstance();
+                memberName = clientCache.getDistributedSystem().getDistributedMember().getName();
+                hostName = clientCache.getDistributedSystem().getDistributedMember().getHost();
+            } catch (Exception ex) {
+                log.warn("No client cache was found");
+            }
+        } else {
+            try {
+                cache = (InternalCache) CacheFactory.getAnyInstance();
+                clusterId = cache.getInternalDistributedSystem().getConfig().getDistributedSystemId();
+                memberName = cache.getInternalDistributedSystem().getName();
+                hostName = cache.getInternalDistributedSystem().getDistributedMember().getHost();
+            } catch (Exception ex) {
+                log.warn("No server cache was found");
+            }
         }
 
         if (clientCache == null && cache == null) {
@@ -126,7 +129,7 @@ public class CommonMeterInfo {
             throw new IllegalArgumentException("Host name must not be empty");
         } else {
             Set<Tag> tags = new HashSet();
-            if (!isClient) {
+            if (!client) {
                 tags.add(Tag.of("cluster", String.valueOf(clusterId)));
             }
 
@@ -135,12 +138,13 @@ public class CommonMeterInfo {
             }
 
             tags.add(Tag.of("host", hostName));
-            tags.add(Tag.of("member.type", memberTypeFor(isClient, hasLocators, hasCacheServer)));
+            tags.add(Tag.of("type", memberTypeFor(client, hasLocators, hasCacheServer)));
 
             Tag[] aTags = new Tag[tags.size()];
             tags.toArray(aTags);
             Iterable iterable = () -> Arrays.stream(aTags).iterator();
-            return iterable;
+
+            return Tags.of(iterable);
         }
     }
 
