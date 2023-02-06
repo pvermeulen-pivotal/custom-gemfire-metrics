@@ -1,5 +1,6 @@
 package com.vmware.data.gemfire.metrics.server;
 
+import com.vmware.data.gemfire.metrics.exceptions.ServiceNotAvailableException;
 import lombok.extern.slf4j.Slf4j;
 
 import org.apache.geode.cache.CacheFactory;
@@ -18,10 +19,6 @@ import java.util.Set;
 
 @Slf4j
 public class ApplicationServerMetricsFunction implements Function {
-    @Override
-    public boolean hasResult() {
-        return true;
-    }
 
     @Override
     public void execute(FunctionContext functionContext) {
@@ -35,10 +32,16 @@ public class ApplicationServerMetricsFunction implements Function {
                 members.remove(a);
             }
         });
+        log.info("Running ApplicationServerMetricsJMXFunction on members: {}", members);
         ResultCollector jmxResults = FunctionService.onMembers(members).withCollector(new DefaultResultCollector())
                 .setArguments(params).execute("ApplicationServerMetricsJMXFunction");
         functionContext.getResultSender().lastResult(jmxResults.getResult());
         log.info("ApplicationServerMetricsFunction completed {}", jmxResults);
+    }
+
+    @Override
+    public boolean hasResult() {
+        return true;
     }
 
     @Override
